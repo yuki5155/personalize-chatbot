@@ -41,6 +41,13 @@ async def set_user_cookie(response: Response):
     Returns:
         Dict: 処理結果
     """
-    # Cookieを設定（実際のアプリではセキュアな設定が必要）
-    response.set_cookie(key="user_id", value="default_user")
+    # Cookieを設定（持続するように適切な属性を設定）
+    response.set_cookie(
+        key="user_id", 
+        value="default_user",
+        max_age=3600 * 24 * 30,  # 30日間有効
+        path="/",                # 全てのパスで有効
+        httponly=True,          # JavaScriptからアクセス不可
+        # 開発環境ではSameSite属性を省略
+    )
     return {"message": "ユーザーIDをCookieに設定しました"} 

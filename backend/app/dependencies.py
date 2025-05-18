@@ -21,6 +21,8 @@ async def get_user_from_cookie(user_id: Optional[str] = Cookie(None)) -> Dict[st
     Raises:
         HTTPException: ユーザーが見つからない場合は401エラー
     """
+
+    print("get_user_from_cookie")
     # Cookieが存在しない場合
     if user_id is None:
         raise HTTPException(
@@ -29,6 +31,7 @@ async def get_user_from_cookie(user_id: Optional[str] = Cookie(None)) -> Dict[st
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    print(user_id)
     # ユーザーデータベースからユーザー情報を取得
     user = USERS_DB.get(user_id)
     
