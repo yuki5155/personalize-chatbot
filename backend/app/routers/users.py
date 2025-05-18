@@ -30,18 +30,17 @@ async def get_current_user(user: Dict[str, Any] = Depends(get_user_from_cookie))
     return user
 
 
-@router.get("/set-cookie/{user_id}")
+@router.get("/set-cookie")
 async def set_user_cookie(response: Response):
     """
     テスト用: ユーザーIDをCookieに設定します
     
     Args:
-        user_id: 設定するユーザーID
         response: レスポンスオブジェクト
     
     Returns:
         Dict: 処理結果
     """
     # Cookieを設定（実際のアプリではセキュアな設定が必要）
-    response.set_cookie(key="user_id", value="user_id")
-    return {"message": "ユーザーID user_id をCookieに設定しました"} 
+    response.set_cookie(key="user_id", value="default_user")
+    return {"message": "ユーザーIDをCookieに設定しました"} 

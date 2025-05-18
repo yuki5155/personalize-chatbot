@@ -26,10 +26,22 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent, onMounted } from 'vue';
+import { userService } from '../api/services';
 
 export default defineComponent({
-  name: 'HomePage'
+  name: 'HomePage',
+  setup() {
+    onMounted(async () => {
+      try {
+        // Home画面にアクセスした時に、user cookieを設定
+        await userService.setUserCookie();
+        console.log('ユーザークッキーが設定されました');
+      } catch (error) {
+        console.error('ユーザークッキー設定中にエラーが発生しました:', error);
+      }
+    });
+  }
 });
 </script>
 
