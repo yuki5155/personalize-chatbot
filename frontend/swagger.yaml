@@ -1,0 +1,755 @@
+openapi: 3.0.0
+info:
+  title: Chatbot API
+  description: API for interacting with the chatbot application, using Amazon Cognito for authentication
+  version: 1.0.0
+servers:
+  - url: /api/v1
+    description: Main API server
+tags:
+  - name: Auth
+    description: Authentication operations
+  - name: Threads
+    description: Thread management operations
+  - name: Messages
+    description: Message operations
+  - name: Settings
+    description: User settings operations
+  - name: Presets
+    description: Chat preset operations
+
+paths:
+  /auth/session:
+    get:
+      tags:
+        - Auth
+      summary: Validate session
+      description: Verify the current session and return the user information
+      responses:
+        '200':
+          description: Valid session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: User logout
+      description: Logout the current user and invalidate session
+      responses:
+        '200':
+          description: Successful logout
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logout successful
+
+  /auth/user:
+    get:
+      tags:
+        - Auth
+      summary: Get current user
+      description: Retrieve information about the currently authenticated user
+      responses:
+        '200':
+          description: User information retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /threads:
+    get:
+      tags:
+        - Threads
+      summary: Get all threads
+      description: Retrieve all threads for the current user
+      responses:
+        '200':
+          description: List of threads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    title:
+                      type: string
+                      example: "General Questions"
+                    createdAt:
+                      type: string
+                      format: date-time
+                      example: '2023-04-10T16:30:00Z'
+                    updatedAt:
+                      type: string
+                      format: date-time
+                      example: '2023-04-11T10:45:00Z'
+                    isActive:
+                      type: boolean
+                      example: true
+                    messageCount:
+                      type: integer
+                      example: 12
+                    lastMessage:
+                      type: object
+                      properties:
+                        text:
+                          type: string
+                          example: "How can I help you today?"
+                        sender:
+                          type: string
+                          enum: [user, assistant]
+                          example: assistant
+                        timestamp:
+                          type: string
+                          format: date-time
+                          example: '2023-04-11T10:45:00Z'
+    post:
+      tags:
+        - Threads
+      summary: Create new thread
+      description: Create a new chat thread
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: My new conversation
+      responses:
+        '201':
+          description: Thread created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thread'
+
+  /threads/{threadId}:
+    get:
+      tags:
+        - Threads
+      summary: Get thread details
+      description: Retrieve a specific thread with all its messages
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Thread details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thread'
+        '404':
+          description: Thread not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    put:
+      tags:
+        - Threads
+      summary: Update thread
+      description: Update thread properties
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: Updated thread title
+                isActive:
+                  type: boolean
+                  example: true
+      responses:
+        '200':
+          description: Thread updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thread'
+        '404':
+          description: Thread not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    delete:
+      tags:
+        - Threads
+      summary: Delete thread
+      description: Delete a thread and all its messages
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Thread deleted
+        '404':
+          description: Thread not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /threads/{threadId}/messages:
+    get:
+      tags:
+        - Messages
+      summary: Get thread messages
+      description: Retrieve all messages in a specific thread
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    text:
+                      type: string
+                      example: "Hello, I need some help with your product."
+                    sender:
+                      type: string
+                      enum: [user, assistant]
+                      example: user
+                    timestamp:
+                      type: string
+                      format: date-time
+                      example: '2023-04-11T10:45:00Z'
+                    attachments:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            example: 1
+                          filename:
+                            type: string
+                            example: "document.pdf"
+                          url:
+                            type: string
+                            example: "https://storage.example.com/files/document.pdf"
+                          mimeType:
+                            type: string
+                            example: "application/pdf"
+                          size:
+                            type: integer
+                            example: 1048576
+        '404':
+          description: Thread not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    post:
+      tags:
+        - Messages
+      summary: Send a message
+      description: Send a new user message to the thread and get a bot response
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - text
+              properties:
+                text:
+                  type: string
+                  example: Hello, can you help me with a question?
+      responses:
+        '201':
+          description: Message sent and bot responded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  userMessage:
+                    $ref: '#/components/schemas/Message'
+                  botResponse:
+                    $ref: '#/components/schemas/Message'
+        '404':
+          description: Thread not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /settings:
+    get:
+      tags:
+        - Settings
+      summary: Get user settings
+      description: Retrieve all settings for the current user
+      responses:
+        '200':
+          description: User settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    put:
+      tags:
+        - Settings
+      summary: Update settings
+      description: Update user settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Settings'
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /presets:
+    get:
+      tags:
+        - Presets
+      summary: Get all presets
+      description: Retrieve all available chat presets
+      responses:
+        '200':
+          description: List of presets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    name:
+                      type: string
+                      example: "Customer Support Inquiry"
+                    description:
+                      type: string
+                      example: "Template for handling customer support questions"
+                    category:
+                      type: string
+                      example: "support"
+                    tags:
+                      type: array
+                      items:
+                        type: string
+                      example: ["customer", "help"]
+                    createdAt:
+                      type: string
+                      format: date-time
+                      example: '2023-04-10T15:30:00Z'
+                    updatedAt:
+                      type: string
+                      format: date-time
+                      example: '2023-04-11T10:45:00Z'
+                    initialMessagesCount:
+                      type: integer
+                      example: 3
+
+  /presets/{presetId}:
+    get:
+      tags:
+        - Presets
+      summary: Get preset details
+      description: Retrieve details of a specific preset
+      parameters:
+        - name: presetId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Preset details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preset'
+        '404':
+          description: Preset not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /threads/create-from-preset/{presetId}:
+    post:
+      tags:
+        - Threads
+        - Presets
+      summary: Create thread from preset
+      description: Create a new thread using a preset as a template
+      parameters:
+        - name: presetId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '201':
+          description: Thread created from preset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thread'
+        '404':
+          description: Preset not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        sub:
+          type: string
+          description: Cognito User ID (sub)
+          example: "12345678-1234-1234-1234-123456789012"
+        username:
+          type: string
+          example: user123
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        createdAt:
+          type: string
+          format: date-time
+          example: '2023-04-10T15:30:00Z'
+        
+    Thread:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: General Questions
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                example: 1
+              text:
+                type: string
+                example: "Hello, I need some help with your product."
+              sender:
+                type: string
+                enum: [user, assistant]
+                example: user
+              timestamp:
+                type: string
+                format: date-time
+                example: '2023-04-11T10:45:00Z'
+              attachments:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    filename:
+                      type: string
+                      example: "document.pdf"
+                    url:
+                      type: string
+                      example: "https://storage.example.com/files/document.pdf"
+                    mimeType:
+                      type: string
+                      example: "application/pdf"
+        createdAt:
+          type: string
+          format: date-time
+          example: '2023-04-10T16:30:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2023-04-11T10:45:00Z'
+        isActive:
+          type: boolean
+          example: true
+          
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        text:
+          type: string
+          example: Hello, I need some help with your product.
+        sender:
+          type: string
+          enum: [user, assistant]
+          example: user
+        timestamp:
+          type: string
+          format: date-time
+          example: '2023-04-11T10:45:00Z'
+          
+    Settings:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        userId:
+          type: integer
+          example: 1
+        theme:
+          type: string
+          enum: [light, dark, system]
+          example: dark
+        notificationsEnabled:
+          type: boolean
+          example: true
+        fontSize:
+          type: string
+          enum: [small, medium, large]
+          example: medium
+        language:
+          type: string
+          example: ja
+          
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Invalid session
+        statusCode:
+          type: integer
+          example: 401
+    
+    Preset:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Customer Support Inquiry"
+        description:
+          type: string
+          example: "Template for handling customer support questions"
+        initialMessages:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+                example: "Hello, how can I help you today?"
+              sender:
+                type: string
+                enum: [user, assistant]
+                example: assistant
+              order:
+                type: integer
+                description: Order of the message in the sequence
+                example: 1
+              options:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    text:
+                      type: string
+                      example: "I have a billing question"
+                    nextMessageId:
+                      type: integer
+                      example: 2
+        category:
+          type: string
+          example: "support"
+        tags:
+          type: array
+          items:
+            type: string
+            example: "customer"
+          example: ["customer", "help"]
+        createdAt:
+          type: string
+          format: date-time
+          example: '2023-04-10T15:30:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2023-04-11T10:45:00Z'
+          
+    PresetInput:
+      type: object
+      required:
+        - name
+        - initialMessages
+      properties:
+        name:
+          type: string
+          example: "Customer Support Inquiry"
+        description:
+          type: string
+          example: "Template for handling customer support questions"
+        initialMessages:
+          type: array
+          items:
+            type: object
+            required:
+              - text
+              - sender
+            properties:
+              text:
+                type: string
+                example: "Hello, how can I help you today?"
+              sender:
+                type: string
+                enum: [user, assistant]
+                example: assistant
+              order:
+                type: integer
+                description: Order of the message in the sequence
+                example: 1
+              options:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    text:
+                      type: string
+                      example: "I have a billing question"
+                    nextMessageId:
+                      type: integer
+                      example: 2
+        category:
+          type: string
+          example: "support"
+        tags:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 50
+          example: ["customer", "help"]
+          
+    PresetMessage:
+      type: object
+      required:
+        - text
+        - sender
+      properties:
+        text:
+          type: string
+          example: "Hello, how can I help you today?"
+        sender:
+          type: string
+          enum: [user, assistant]
+          example: assistant
+        order:
+          type: integer
+          description: Order of the message in the sequence
+          example: 1
+  
+  securitySchemes:
+    CognitoAuth:
+      type: apiKey
+      in: cookie
+      name: sessionId
+      description: Cookie-based session authentication after Cognito login
+
+security:
+  - CognitoAuth: [] 
