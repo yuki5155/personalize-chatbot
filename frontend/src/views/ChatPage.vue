@@ -269,7 +269,7 @@ export default defineComponent({
 
 .sidebar {
   width: 300px;
-  background-color: #e0e0e0;
+  background-color: #ffffff;
   border-right: 1px solid #d0d0d0;
   overflow: hidden;
   display: flex;
@@ -310,15 +310,15 @@ export default defineComponent({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: #e8e8e8;
+  background-color: #ffffff;
 }
 
 .thread-item:hover {
-  background-color: #d5d5d5;
+  background-color: #f0f0f0;
 }
 
 .thread-item.active {
-  background-color: #c8e9d8;
+  background-color: #e5f4ec;
   border-left: 4px solid #42b983;
 }
 
@@ -566,8 +566,7 @@ export default defineComponent({
 }
 
 .dark-mode .sidebar {
-  background-color: #262626;
-  border-right-color: #333;
+  background-color: #1a1a1a;
 }
 
 .dark-mode .sidebar-header {
@@ -579,7 +578,7 @@ export default defineComponent({
 }
 
 .dark-mode .thread-item {
-  border-bottom-color: #333;
+  background-color: #1a1a1a;
 }
 
 .dark-mode .thread-item:hover {
@@ -587,15 +586,15 @@ export default defineComponent({
 }
 
 .dark-mode .thread-item.active {
-  background-color: rgba(66, 185, 131, 0.2);
+  background-color: #164731;
 }
 
 .dark-mode .thread-title {
-  color: #f5f5f5;
+  color: #ffffff;
 }
 
 .dark-mode .thread-meta {
-  color: #aaa;
+  color: #ffffff;
 }
 
 .dark-mode .chat-container {

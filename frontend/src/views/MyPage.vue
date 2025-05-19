@@ -213,13 +213,18 @@ th, td {
 }
 
 th {
-  background-color: #f5f5f5;
+  background-color: #42b983;
   font-weight: bold;
-  color: #333;
+  color: #ffffff;
+}
+
+td {
+  color: #000000;
+  background-color: #ffffff;
 }
 
 tr:hover {
-  background-color: rgba(66, 185, 131, 0.05);
+  background-color: #f0f0f0;
 }
 
 .status {
@@ -231,13 +236,13 @@ tr:hover {
 }
 
 .status.active {
-  background-color: rgba(66, 185, 131, 0.2);
-  color: #42b983;
+  background-color: #42b983;
+  color: #ffffff;
 }
 
 .status.inactive {
-  background-color: rgba(160, 160, 160, 0.2);
-  color: #666;
+  background-color: #666666;
+  color: #ffffff;
 }
 
 .action-buttons {
@@ -247,10 +252,11 @@ tr:hover {
 
 .view-btn, .toggle-btn {
   font-size: 0.8rem;
-  padding: 0.25rem 0.5rem;
+  padding: 0.4rem 0.8rem;
   border-radius: 4px;
   border: none;
   cursor: pointer;
+  font-weight: bold;
 }
 
 .view-btn {
@@ -260,8 +266,8 @@ tr:hover {
 }
 
 .toggle-btn {
-  background-color: #f0f0f0;
-  color: #666;
+  background-color: #666666;
+  color: white;
 }
 
 .loading, .empty-state {
@@ -270,8 +276,11 @@ tr:hover {
   align-items: center;
   justify-content: center;
   padding: 3rem;
-  color: #666;
+  color: #000000;
   text-align: center;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .spinner {
