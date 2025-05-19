@@ -191,4 +191,4 @@ async def get_thread(thread_id: int, user: Dict[str, Any] = Depends(get_user_fro
             return thread
     
     # スレッドが見つからない場合は404エラー
-    raise HTTPException(status_code=404, detail="Thread not found")
+    raise HTTPException(status_code=404, detail="Thread not found") 
