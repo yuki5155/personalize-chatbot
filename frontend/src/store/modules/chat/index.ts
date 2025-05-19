@@ -1,5 +1,6 @@
 import { Module } from 'vuex';
 import { RootState } from '../../types';
+import { chatService } from '../../../api/services';
 
 // メッセージの型定義
 export interface Message {
@@ -24,7 +25,16 @@ export interface ChatState {
   threads: Thread[];
   currentThreadId: number | null;
   loading: boolean;
+  error: string | null;
 }
+
+// ActionContextの型定義
+type Context = {
+  commit: (type: string, payload?: any) => void;
+  dispatch: (type: string, payload?: any) => Promise<any>;
+  state: ChatState;
+  rootState: RootState;
+};
 
 const chatModule: Module<ChatState, RootState> = {
   namespaced: true,
@@ -32,7 +42,8 @@ const chatModule: Module<ChatState, RootState> = {
   state: {
     threads: [],
     currentThreadId: null,
-    loading: false
+    loading: false,
+    error: null
   },
   
   getters: {
@@ -46,12 +57,18 @@ const chatModule: Module<ChatState, RootState> = {
       return state.threads.reduce((total, thread) => total + thread.messages.length, 0);
     },
     totalThreadCount: (state: ChatState) => state.threads.length,
-    activeThreadCount: (state: ChatState) => state.threads.filter(thread => thread.isActive).length
+    activeThreadCount: (state: ChatState) => state.threads.filter(thread => thread.isActive).length,
+    isLoading: (state: ChatState) => state.loading,
+    error: (state: ChatState) => state.error
   },
   
   mutations: {
     setLoading(state: ChatState, loading: boolean) {
       state.loading = loading;
+    },
+    
+    setError(state: ChatState, error: string | null) {
+      state.error = error;
     },
     
     setThreads(state: ChatState, threads: Thread[]) {
@@ -62,41 +79,16 @@ const chatModule: Module<ChatState, RootState> = {
       state.currentThreadId = threadId;
     },
     
-    addThread(state: ChatState, title: string) {
-      const newId = state.threads.length > 0 
-        ? Math.max(...state.threads.map(t => t.id)) + 1 
-        : 1;
-      
-      const now = Date.now();
-      
-      const newThread: Thread = {
-        id: newId,
-        title: title || `スレッド ${newId}`,
-        messages: [],
-        createdAt: now,
-        updatedAt: now,
-        isActive: true
-      };
-      
-      state.threads.push(newThread);
-      state.currentThreadId = newId;
+    addThread(state: ChatState, thread: Thread) {
+      state.threads.push(thread);
+      state.currentThreadId = thread.id;
     },
     
-    addMessage(state: ChatState, { threadId, text, sender }: { threadId: number, text: string, sender: 'user' | 'assistant' }) {
+    addMessage(state: ChatState, { threadId, message }: { threadId: number, message: Message }) {
       const thread = state.threads.find(t => t.id === threadId);
       
       if (thread) {
-        const newId = thread.messages.length > 0 
-          ? Math.max(...thread.messages.map(m => m.id)) + 1 
-          : 1;
-        
-        thread.messages.push({
-          id: newId,
-          text,
-          sender,
-          timestamp: Date.now()
-        });
-        
+        thread.messages.push(message);
         thread.updatedAt = Date.now();
       }
     },
@@ -110,75 +102,84 @@ const chatModule: Module<ChatState, RootState> = {
   },
   
   actions: {
-    // スレッドをロード
-    loadThreads({ commit }) {
+    // スレッドをAPIからロード
+    async loadThreads({ commit, state }: Context) {
       commit('setLoading', true);
+      commit('setError', null);
       
-      // localStorage から読み込み（実際のアプリではAPIからロードする場合も）
-      setTimeout(() => {
-        try {
-          const savedThreads = localStorage.getItem('chatThreads');
-          if (savedThreads) {
-            commit('setThreads', JSON.parse(savedThreads));
-          } else {
-            // 初期スレッド
-            commit('setThreads', []);
-          }
-        } catch (error) {
-          console.error('Error loading threads:', error);
-          commit('setThreads', []);
-        } finally {
-          commit('setLoading', false);
+      try {
+        const threads = await chatService.getThreads();
+        commit('setThreads', threads);
+        
+        // 最初のスレッドをカレントに設定
+        if (threads.length > 0 && !state.currentThreadId) {
+          commit('setCurrentThreadId', threads[0].id);
         }
-      }, 500);
-    },
-    
-    // スレッドを保存
-    saveThreads({ state }) {
-      localStorage.setItem('chatThreads', JSON.stringify(state.threads));
+      } catch (error) {
+        console.error('Error loading threads:', error);
+        commit('setError', 'スレッドの読み込みに失敗しました');
+        commit('setThreads', []);
+      } finally {
+        commit('setLoading', false);
+      }
     },
     
     // 新しいスレッドを作成
-    createThread({ commit, dispatch }, title: string) {
+    async createThread({ commit, dispatch }: Context, title: string) {
       commit('setLoading', true);
+      commit('setError', null);
       
-      setTimeout(() => {
-        commit('addThread', title);
-        dispatch('saveThreads');
+      try {
+        const newThread = await chatService.createThread(title);
+        commit('addThread', newThread);
+      } catch (error) {
+        console.error('Error creating thread:', error);
+        commit('setError', 'スレッドの作成に失敗しました');
+      } finally {
         commit('setLoading', false);
-      }, 300);
+      }
     },
     
     // メッセージを送信（ユーザーから）
-    sendMessage({ commit, dispatch, state }, text: string) {
+    async sendMessage({ commit, state }: Context, text: string) {
       if (!state.currentThreadId) return;
       
-      commit('addMessage', {
-        threadId: state.currentThreadId,
-        text,
-        sender: 'user'
-      });
-      
-      // ボットの応答をシミュレート
-      setTimeout(() => {
+      try {
+        // ユーザーメッセージを送信
+        const userMessage = await chatService.sendMessage(state.currentThreadId, text);
         commit('addMessage', {
           threadId: state.currentThreadId,
-          text: `「${text}」に対する応答です。これはシミュレートされたボットの返信です。`,
-          sender: 'assistant'
+          message: userMessage
         });
         
-        dispatch('saveThreads');
-      }, 1000);
+        // ボットの応答をシミュレート
+        setTimeout(async () => {
+          // 実際のAPIでは、ここでボットの応答を取得するエンドポイントを呼び出す
+          const botMessage: Message = {
+            id: Math.floor(Math.random() * 10000),
+            text: `「${text}」に対する応答です。これはシミュレートされたボットの返信です。`,
+            sender: 'assistant',
+            timestamp: Date.now()
+          };
+          
+          commit('addMessage', {
+            threadId: state.currentThreadId,
+            message: botMessage
+          });
+        }, 1000);
+      } catch (error) {
+        console.error('Error sending message:', error);
+        commit('setError', 'メッセージの送信に失敗しました');
+      }
     },
     
     // スレッドの有効/無効を切り替え
-    toggleThread({ commit, dispatch }, threadId: number) {
+    toggleThread({ commit }: Context, threadId: number) {
       commit('toggleThreadActive', threadId);
-      dispatch('saveThreads');
     },
     
     // 現在のスレッドを変更
-    setCurrentThread({ commit }, threadId: number | null) {
+    setCurrentThread({ commit }: Context, threadId: number | null) {
       commit('setCurrentThreadId', threadId);
     }
   }
