@@ -45,22 +45,14 @@ const chatService = {
     }
   },
 
-  // 新しいスレッドの作成 (実際のAPIでは別途エンドポイントがあるはずですが、今回のモックAPIでは未実装)
-  // 実際のエンドポイントに合わせて適宜変更してください
-  createThread: async (title: string): Promise<Thread> => {
+  // 新しいスレッドの作成
+  createThread: async (title: string, first_message: string): Promise<Thread> => {
     try {
-      // 実際のAPIエンドポイントがある場合はここでPOSTリクエストを送信
-      // ダミーレスポンスを返す（モックAPI対応）
-      const dummyResponse = {
-        id: Math.floor(Math.random() * 10000),
+      const response = await apiClient.post('/threads', {
         title,
-        messages: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        isActive: true
-      } as Thread;
-
-      return dummyResponse;
+        first_message
+      });
+      return response.data;
     } catch (error) {
       console.error('スレッドの作成に失敗しました:', error);
       throw error;

@@ -125,12 +125,12 @@ const chatModule: Module<ChatState, RootState> = {
     },
     
     // 新しいスレッドを作成
-    async createThread({ commit, dispatch }: Context, title: string) {
+    async createThread({ commit, dispatch }: Context, { title, firstMessage }: { title: string, firstMessage: string }) {
       commit('setLoading', true);
       commit('setError', null);
       
       try {
-        const newThread = await chatService.createThread(title);
+        const newThread = await chatService.createThread(title, firstMessage);
         commit('addThread', newThread);
       } catch (error) {
         console.error('Error creating thread:', error);

@@ -107,6 +107,13 @@
       @close="closeSettings"
       @save="onSettingsSave"
     />
+    
+    <!-- 新規スレッド作成モーダル -->
+    <NewThreadModal
+      :isOpen="isNewThreadModalOpen"
+      @close="closeNewThreadModal"
+      @create="onNewThreadCreate"
+    />
   </div>
 </template>
 
@@ -114,12 +121,14 @@
 import { defineComponent, ref, computed, onMounted, reactive } from 'vue';
 import { useStore } from 'vuex';
 import SettingsModal from '../components/SettingsModal.vue';
+import NewThreadModal from '../components/NewThreadModal.vue';
 
 export default defineComponent({
   name: 'ChatPage',
   
   components: {
-    SettingsModal
+    SettingsModal,
+    NewThreadModal
   },
   
   setup() {
@@ -127,6 +136,7 @@ export default defineComponent({
     const newMessage = ref('');
     const newThreadTitle = ref('');
     const isSettingsOpen = ref(false);
+    const isNewThreadModalOpen = ref(false);
     
     // 設定の状態を保持
     const settings = reactive({
@@ -169,12 +179,20 @@ export default defineComponent({
       });
     });
     
-    // 新規スレッド作成
+    // 新規スレッド作成モーダルを開く
     const createNewThread = () => {
-      const title = prompt('新しいスレッドのタイトルを入力してください:', `新しいスレッド ${threads.value.length + 1}`);
-      if (title) {
-        store.dispatch('chat/createThread', title);
-      }
+      isNewThreadModalOpen.value = true;
+    };
+    
+    // 新規スレッド作成モーダルを閉じる
+    const closeNewThreadModal = () => {
+      isNewThreadModalOpen.value = false;
+    };
+    
+    // 新規スレッド作成処理
+    const onNewThreadCreate = ({ title, firstMessage }: { title: string, firstMessage: string }) => {
+      store.dispatch('chat/createThread', { title, firstMessage });
+      closeNewThreadModal();
     };
     
     // スレッド選択
@@ -239,10 +257,13 @@ export default defineComponent({
       loading,
       newMessage,
       isSettingsOpen,
+      isNewThreadModalOpen,
       settings,
       presets,
       usePreset,
       createNewThread,
+      closeNewThreadModal,
+      onNewThreadCreate,
       selectThread,
       sendMessage,
       toggleThreadActive,
@@ -259,43 +280,69 @@ export default defineComponent({
 <style scoped>
 .chat-page {
   display: flex;
-  width: 100%;
-  height: calc(100vh - 150px);
-  min-height: 500px;
-  border-radius: 10px;
+  height: calc(100vh - 60px); /* 60pxはヘッダーの高さを想定 */
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  background-color: #f8f9fa;
+  transition: background-color 0.3s;
+}
+
+.dark-mode {
+  background-color: #222;
+  color: #f8f9fa;
 }
 
 .sidebar {
   width: 300px;
-  background-color: #ffffff;
-  border-right: 1px solid #d0d0d0;
-  overflow: hidden;
+  border-right: 1px solid #e9ecef;
   display: flex;
   flex-direction: column;
+  background-color: #fff;
+  transition: background-color 0.3s;
+}
+
+.dark-mode .sidebar {
+  background-color: #2a2a2a;
+  border-right-color: #444;
 }
 
 .sidebar-header {
-  padding: 1rem;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 15px;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dark-mode .sidebar-header {
+  border-bottom-color: #444;
 }
 
 .sidebar-header h2 {
-  color: #000000;
-  font-weight: bold;
+  margin: 0;
+  font-size: 1.25rem;
 }
 
 .new-thread-btn {
-  background-color: #42b983;
+  background-color: #007bff;
   color: white;
   border: none;
-  width: 100%;
-  padding: 0.5rem;
-  margin-top: 0.5rem;
-  cursor: pointer;
   border-radius: 4px;
-  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.new-thread-btn:hover {
+  background-color: #0069d9;
+}
+
+.dark-mode .new-thread-btn {
+  background-color: #0056b3;
+}
+
+.dark-mode .new-thread-btn:hover {
+  background-color: #004494;
 }
 
 .thread-list {
@@ -557,74 +604,6 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   height: 100%;
-}
-
-/* ダークモード */
-.dark-mode {
-  background-color: #1a1a1a;
-  color: #f5f5f5;
-}
-
-.dark-mode .sidebar {
-  background-color: #1a1a1a;
-}
-
-.dark-mode .sidebar-header {
-  border-bottom-color: #333;
-}
-
-.dark-mode .sidebar-header h2 {
-  color: #f5f5f5;
-}
-
-.dark-mode .thread-item {
-  background-color: #1a1a1a;
-}
-
-.dark-mode .thread-item:hover {
-  background-color: #333;
-}
-
-.dark-mode .thread-item.active {
-  background-color: #164731;
-}
-
-.dark-mode .thread-title {
-  color: #ffffff;
-}
-
-.dark-mode .thread-meta {
-  color: #ffffff;
-}
-
-.dark-mode .chat-container {
-  background-color: #1a1a1a;
-}
-
-.dark-mode .chat-header {
-  background-color: #262626;
-  border-bottom-color: #333;
-}
-
-.dark-mode .message.assistant {
-  background-color: #333;
-  color: #f5f5f5;
-}
-
-.dark-mode .message-input input {
-  background-color: #333;
-  color: #f5f5f5;
-  border-color: #444;
-}
-
-.dark-mode .message-input input::placeholder {
-  color: #aaa;
-}
-
-.dark-mode .no-thread-selected h2,
-.dark-mode .empty-messages p,
-.dark-mode .empty-state p {
-  color: #f5f5f5;
 }
 
 /* 文字サイズ */
