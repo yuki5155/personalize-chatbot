@@ -44,11 +44,9 @@
         </div>
       </div>
     </div>
+    
     <div class="chat-container">
-      <div v-if="!currentThread" class="no-thread-selected">
-        <h2>スレッドを選択するか、新しいスレッドを作成してください</h2>
-      </div>
-      <div v-else class="chat-area">
+      <div v-if="currentThread" class="chat-wrapper">
         <div class="chat-header">
           <h2>{{ currentThread.title }}</h2>
           <div class="header-actions">
@@ -58,45 +56,25 @@
             </button>
           </div>
         </div>
-        <div :class="['messages', { 'inactive-thread': !currentThread.isActive }]">
-          <div v-if="currentThread.messages.length === 0" class="empty-messages">
-            <p>メッセージがありません。</p>
-            <p>最初のメッセージを送信してください。</p>
-          </div>
-          <div 
-            v-for="message in currentThread.messages" 
-            :key="message.id"
-            :class="['message', message.sender]"
-          >
-            <div class="message-content">
-              <div class="message-text">{{ message.text }}</div>
-              <div class="message-time">{{ formatTime(message.timestamp) }}</div>
-            </div>
-          </div>
-        </div>
-        <div class="message-input">
-          <div class="preset-buttons">
-            <button 
-              v-for="(preset, index) in presets" 
-              :key="index" 
-              @click="usePreset(preset)"
-              :disabled="!currentThread || !currentThread.isActive"
-              class="preset-button"
-            >
-              {{ preset.label }}
-            </button>
-          </div>
-          <form @submit.prevent="sendMessage">
-            <input 
-              v-model="newMessage" 
-              placeholder="メッセージを入力..." 
-              :disabled="!currentThread || !currentThread.isActive"
-            />
-            <button type="submit" :disabled="!newMessage || !currentThread || !currentThread.isActive">送信</button>
-          </form>
-          <div v-if="currentThread && !currentThread.isActive" class="inactive-thread-notice">
-            このスレッドは無効化されています。メッセージを送信するには、スレッドを有効化してください。
-          </div>
+        
+        <ChatArea @new-thread="createNewThread" />
+        
+        <ChatInputForm 
+          :disabled="!currentThread.isActive || isTyping" 
+          @send-message="handleSendMessage" 
+        />
+      </div>
+      
+      <div v-else class="empty-chat">
+        <div class="empty-chat-content">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="empty-icon">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z" />
+          </svg>
+          <h2>会話を始めましょう</h2>
+          <p>左側のメニューから会話を選択するか、新しい会話を始めてください。</p>
+          <button @click="createNewThread" class="new-chat-btn">
+            新しい会話を始める
+          </button>
         </div>
       </div>
     </div>
@@ -122,19 +100,21 @@ import { defineComponent, ref, computed, onMounted, reactive } from 'vue';
 import { useStore } from 'vuex';
 import SettingsModal from '../components/SettingsModal.vue';
 import NewThreadModal from '../components/NewThreadModal.vue';
+import ChatArea from '../components/ChatArea.vue';
+import ChatInputForm from '../components/ChatInputForm.vue';
 
 export default defineComponent({
   name: 'ChatPage',
   
   components: {
     SettingsModal,
-    NewThreadModal
+    NewThreadModal,
+    ChatArea,
+    ChatInputForm
   },
   
   setup() {
     const store = useStore();
-    const newMessage = ref('');
-    const newThreadTitle = ref('');
     const isSettingsOpen = ref(false);
     const isNewThreadModalOpen = ref(false);
     
@@ -146,19 +126,12 @@ export default defineComponent({
       notificationSound: true
     });
     
-    // プリセットメッセージの定義
-    const presets = reactive([
-      { label: '自己紹介', text: 'こんにちは！あなたについて教えてください。' },
-      { label: '機能説明', text: 'このチャットボットでできることを教えてください。' },
-      { label: 'ヘルプ', text: '使い方について教えてください。' },
-      { label: '雑談', text: '今日の天気はどうですか？' }
-    ]);
-    
     // ストアからのデータ取得
     const threads = computed(() => store.getters['chat/allThreads']);
     const currentThreadId = computed(() => store.state.chat.currentThreadId);
     const currentThread = computed(() => store.getters['chat/currentThread']);
     const loading = computed(() => store.state.chat.loading);
+    const isTyping = computed(() => store.getters['chat/isTyping']);
     
     // 設定を読み込む
     const loadSettings = () => {
@@ -200,15 +173,7 @@ export default defineComponent({
       store.dispatch('chat/setCurrentThread', threadId);
     };
     
-    // メッセージ送信
-    const sendMessage = () => {
-      if (newMessage.value && currentThreadId.value) {
-        store.dispatch('chat/sendMessage', newMessage.value);
-        newMessage.value = '';
-      }
-    };
-    
-    // スレッドの有効/無効を切り替え
+    // スレッド有効・無効切り替え
     const toggleThreadActive = (threadId: number) => {
       store.dispatch('chat/toggleThread', threadId);
     };
@@ -223,31 +188,36 @@ export default defineComponent({
       isSettingsOpen.value = false;
     };
     
-    // 設定が保存されたときの処理
+    // 設定保存時の処理
     const onSettingsSave = (newSettings: any) => {
-      console.log('設定が保存されました:', newSettings);
-      // 設定を反映
+      // 設定を更新
       settings.darkMode = newSettings.darkMode;
       settings.fontSize = newSettings.fontSize;
       settings.notifications = newSettings.notifications;
       settings.notificationSound = newSettings.notificationSound;
+      
+      // ストアに設定を保存
+      store.dispatch('settings/saveSettings', newSettings);
+      
+      // モーダルを閉じる
+      closeSettings();
     };
     
-    // プリセットメッセージを使用する
-    const usePreset = (preset: { label: string, text: string }) => {
-      newMessage.value = preset.text;
+    // メッセージを送信
+    const handleSendMessage = (text: string) => {
+      store.dispatch('chat/sendMessage', text);
     };
     
     // 日付フォーマット
     const formatDate = (timestamp: number) => {
       const date = new Date(timestamp);
-      return date.toLocaleDateString('ja-JP');
+      return date.toLocaleDateString();
     };
     
     // 時刻フォーマット
     const formatTime = (timestamp: number) => {
       const date = new Date(timestamp);
-      return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
     
     return {
@@ -255,21 +225,19 @@ export default defineComponent({
       currentThreadId,
       currentThread,
       loading,
-      newMessage,
+      isTyping,
       isSettingsOpen,
       isNewThreadModalOpen,
       settings,
-      presets,
-      usePreset,
       createNewThread,
       closeNewThreadModal,
       onNewThreadCreate,
       selectThread,
-      sendMessage,
       toggleThreadActive,
       openSettings,
       closeSettings,
       onSettingsSave,
+      handleSendMessage,
       formatDate,
       formatTime
     };
@@ -280,333 +248,262 @@ export default defineComponent({
 <style scoped>
 .chat-page {
   display: flex;
-  height: calc(100vh - 60px); /* 60pxはヘッダーの高さを想定 */
-  overflow: hidden;
-  background-color: #f8f9fa;
-  transition: background-color 0.3s;
+  height: calc(100vh - 60px);
+  background-color: #ffffff;
+  color: #1f2937;
 }
 
 .dark-mode {
-  background-color: #222;
-  color: #f8f9fa;
+  background-color: #1f2937;
+  color: #e5e7eb;
 }
 
 .sidebar {
   width: 300px;
-  border-right: 1px solid #e9ecef;
+  border-right: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
-  background-color: #fff;
-  transition: background-color 0.3s;
+  height: 100%;
+  background-color: #f9fafb;
 }
 
 .dark-mode .sidebar {
-  background-color: #2a2a2a;
-  border-right-color: #444;
+  background-color: #111827;
+  border-right-color: #374151;
 }
 
 .sidebar-header {
-  padding: 15px;
-  border-bottom: 1px solid #e9ecef;
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .dark-mode .sidebar-header {
-  border-bottom-color: #444;
-}
-
-.sidebar-header h2 {
-  margin: 0;
-  font-size: 1.25rem;
+  border-bottom-color: #374151;
 }
 
 .new-thread-btn {
-  background-color: #007bff;
+  background-color: #4f46e5;
   color: white;
   border: none;
-  border-radius: 4px;
   padding: 8px 12px;
+  border-radius: 4px;
   cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s;
+  font-size: 0.9rem;
 }
 
 .new-thread-btn:hover {
-  background-color: #0069d9;
-}
-
-.dark-mode .new-thread-btn {
-  background-color: #0056b3;
-}
-
-.dark-mode .new-thread-btn:hover {
-  background-color: #004494;
+  background-color: #4338ca;
 }
 
 .thread-list {
-  flex: 1;
   overflow-y: auto;
+  flex: 1;
 }
 
 .thread-item {
-  padding: 1rem;
-  border-bottom: 1px solid #d0d0d0;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  background-color: #ffffff;
+}
+
+.dark-mode .thread-item {
+  border-bottom-color: #374151;
 }
 
 .thread-item:hover {
-  background-color: #f0f0f0;
+  background-color: #f3f4f6;
+}
+
+.dark-mode .thread-item:hover {
+  background-color: #1e293b;
 }
 
 .thread-item.active {
-  background-color: #e5f4ec;
-  border-left: 4px solid #42b983;
+  background-color: #e0e7ff;
+}
+
+.dark-mode .thread-item.active {
+  background-color: #312e81;
+}
+
+.thread-item-inner {
+  flex: 1;
+  min-width: 0;
 }
 
 .thread-title {
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-  color: #000000;
-  letter-spacing: 0.02em;
-}
-
-.thread-item.active .thread-title {
-  color: #096144;
+  font-weight: 500;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .thread-meta {
-  font-size: 0.8rem;
-  color: #000000;
   display: flex;
-  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.dark-mode .thread-meta {
+  color: #9ca3af;
+}
+
+.thread-date {
+  margin-right: 8px;
+}
+
+.thread-actions {
+  display: flex;
+  align-items: center;
 }
 
 .toggle-btn {
   font-size: 0.7rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
   border: none;
   cursor: pointer;
-  font-weight: 600;
 }
 
 .toggle-btn.active {
-  background-color: #42b983;
+  background-color: #10b981;
   color: white;
 }
 
 .toggle-btn.inactive {
-  background-color: #999;
+  background-color: #ef4444;
   color: white;
+}
+
+.loading, .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #6b7280;
+  text-align: center;
+  padding: 20px;
+}
+
+.dark-mode .loading, .dark-mode .empty-state {
+  color: #9ca3af;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(79, 70, 229, 0.1);
+  border-left-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .chat-container {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: white;
+  overflow: hidden;
 }
 
-.no-thread-selected {
+.chat-wrapper {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
   height: 100%;
-  color: #333;
-  text-align: center;
-  padding: 2rem;
-}
-
-.no-thread-selected h2 {
-  color: #000000;
-  font-weight: bold;
 }
 
 .chat-header {
-  padding: 1rem;
-  border-bottom: 1px solid #e0e0e0;
-  background-color: #e0e0e0;
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.chat-header h2 {
-  color: #000000;
-  font-weight: 700;
-  margin: 0;
-  font-size: 1.2rem;
+.dark-mode .chat-header {
+  border-bottom-color: #374151;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
 }
 
 .inactive-badge {
-  background-color: #e74c3c;
+  background-color: #ef4444;
   color: white;
-  padding: 0.2rem 0.5rem;
+  padding: 4px 8px;
   border-radius: 4px;
   font-size: 0.8rem;
-  font-weight: bold;
+  margin-right: 8px;
 }
 
 .settings-btn {
-  background-color: #fff;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.settings-btn:hover {
-  background-color: #f0f0f0;
-}
-
-.settings-icon {
-  font-size: 1.2rem;
-}
-
-.messages {
-  flex: 1;
-  padding: 1rem;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.messages.inactive-thread {
-  background-color: rgba(231, 76, 60, 0.05);
-  position: relative;
-}
-
-.messages.inactive-thread::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(240, 240, 240, 0.5);
-  pointer-events: none;
-}
-
-.message {
-  max-width: 80%;
-  margin-bottom: 1rem;
-  padding: 0.8rem;
-  border-radius: 10px;
-  position: relative;
-}
-
-.message.user {
-  align-self: flex-end;
-  background-color: #42b983;
-  color: white;
-}
-
-.message.assistant {
-  align-self: flex-start;
-  background-color: #e0e0e0;
-  color: #000000;
-}
-
-.message-text {
-  margin-bottom: 0.3rem;
-}
-
-.message-time {
-  font-size: 0.7rem;
-  opacity: 0.7;
-  text-align: right;
-}
-
-.message-input {
-  padding: 1rem;
-  border-top: 1px solid #e0e0e0;
-}
-
-.message-input form {
-  display: flex;
-}
-
-.message-input input {
-  flex: 1;
-  padding: 0.8rem;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  margin-right: 0.5rem;
-}
-
-.message-input button {
-  background-color: #42b983;
-  color: white;
+  background: none;
   border: none;
-  padding: 0 1.5rem;
-  border-radius: 4px;
   cursor: pointer;
+  font-size: 1.5rem;
 }
 
-.message-input button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
-.inactive-thread-notice {
-  margin-top: 0.5rem;
-  color: #e74c3c;
-  font-size: 0.8rem;
-  text-align: center;
-  padding: 0.5rem;
-  background-color: #fadbd8;
-  border-radius: 4px;
-}
-
-.loading, .empty-state, .empty-messages {
+.empty-chat {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
-  color: #000000;
-  text-align: center;
-}
-
-.spinner {
-  border: 4px solid rgba(0, 0, 0, 0.1);
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border-left-color: #42b983;
-  animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.chat-area {
-  display: flex;
-  flex-direction: column;
   height: 100%;
 }
 
-/* 文字サイズ */
+.empty-chat-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.empty-icon {
+  width: 64px;
+  height: 64px;
+  color: #9ca3af;
+  margin: 0 auto 16px;
+}
+
+.new-chat-btn {
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-top: 16px;
+}
+
+.new-chat-btn:hover {
+  background-color: #4338ca;
+}
+
+/* レスポンシブデザイン */
+@media (max-width: 768px) {
+  .chat-page {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    height: auto;
+    max-height: 40vh;
+  }
+}
+
+/* フォントサイズ設定 */
 .font-size-small {
   font-size: 0.9rem;
 }
@@ -616,66 +513,6 @@ export default defineComponent({
 }
 
 .font-size-large {
-  font-size: 1.2rem;
-}
-
-.font-size-small .message {
-  font-size: 0.9rem;
-}
-
-.font-size-medium .message {
-  font-size: 1rem;
-}
-
-.font-size-large .message {
-  font-size: 1.2rem;
-}
-
-.font-size-small .thread-title {
-  font-size: 0.9rem;
-}
-
-.font-size-medium .thread-title {
-  font-size: 1rem;
-}
-
-.font-size-large .thread-title {
   font-size: 1.1rem;
-}
-
-.preset-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.preset-button {
-  background-color: #f0f0f0;
-  border: 1px solid #ddd;
-  border-radius: 16px;
-  padding: 6px 12px;
-  font-size: 0.9em;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.preset-button:hover {
-  background-color: #e0e0e0;
-}
-
-.preset-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.dark-mode .preset-button {
-  background-color: #444;
-  border-color: #555;
-  color: #ddd;
-}
-
-.dark-mode .preset-button:hover {
-  background-color: #555;
 }
 </style> 

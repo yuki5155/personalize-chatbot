@@ -25,22 +25,35 @@ const chatService = {
     }
   },
 
-  // 新しいメッセージの送信 (実際のAPIでは別途エンドポイントがあるはずですが、今回のモックAPIでは未実装)
-  // 実際のエンドポイントに合わせて適宜変更してください
+  // スレッドのメッセージ一覧を取得
+  getMessages: async (threadId: number): Promise<Message[]> => {
+    try {
+      const response = await apiClient.get(`/messages/${threadId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`スレッド ${threadId} のメッセージ取得に失敗しました:`, error);
+      throw error;
+    }
+  },
+
+  // 新しいメッセージの送信
   sendMessage: async (threadId: number, text: string): Promise<Message> => {
     try {
-      // 実際のAPIエンドポイントがある場合はここでPOSTリクエストを送信
-      // ダミーレスポンスを返す（モックAPI対応）
-      const dummyResponse = {
-        id: Math.floor(Math.random() * 10000),
-        text: text,
-        sender: 'user',
-        timestamp: Date.now()
-      } as Message;
-
-      return dummyResponse;
+      const response = await apiClient.post(`/messages/${threadId}`, { text });
+      return response.data;
     } catch (error) {
       console.error('メッセージの送信に失敗しました:', error);
+      throw error;
+    }
+  },
+
+  // アシスタントからのメッセージ送信 (主にデバッグ・テスト用)
+  sendAssistantMessage: async (threadId: number, text: string): Promise<Message> => {
+    try {
+      const response = await apiClient.post(`/messages/${threadId}/assistant`, { text });
+      return response.data;
+    } catch (error) {
+      console.error('アシスタントメッセージの送信に失敗しました:', error);
       throw error;
     }
   },

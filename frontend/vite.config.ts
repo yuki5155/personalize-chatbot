@@ -25,6 +25,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         ws: true
+      },
+      '/messages': {
+        target: 'http://host.docker.internal:8001', // FastAPIサーバー
+        changeOrigin: true,
+        secure: false,
+        ws: true
       }
     }
   }

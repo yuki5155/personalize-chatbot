@@ -3,7 +3,7 @@ import axios from 'axios';
 // API基本設定
 const apiClient = axios.create({
   // ベースURLなしで相対パスを使用（プロキシ設定に合わせる）
-  baseURL: '', 
+  baseURL: '/', 
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

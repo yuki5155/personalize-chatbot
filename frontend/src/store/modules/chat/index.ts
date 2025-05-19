@@ -26,6 +26,7 @@ export interface ChatState {
   currentThreadId: number | null;
   loading: boolean;
   error: string | null;
+  isTyping: boolean; // ボットが入力中かどうか
 }
 
 // ActionContextの型定義
@@ -43,7 +44,8 @@ const chatModule: Module<ChatState, RootState> = {
     threads: [],
     currentThreadId: null,
     loading: false,
-    error: null
+    error: null,
+    isTyping: false
   },
   
   getters: {
@@ -59,12 +61,17 @@ const chatModule: Module<ChatState, RootState> = {
     totalThreadCount: (state: ChatState) => state.threads.length,
     activeThreadCount: (state: ChatState) => state.threads.filter(thread => thread.isActive).length,
     isLoading: (state: ChatState) => state.loading,
+    isTyping: (state: ChatState) => state.isTyping,
     error: (state: ChatState) => state.error
   },
   
   mutations: {
     setLoading(state: ChatState, loading: boolean) {
       state.loading = loading;
+    },
+    
+    setTyping(state: ChatState, isTyping: boolean) {
+      state.isTyping = isTyping;
     },
     
     setError(state: ChatState, error: string | null) {
@@ -90,6 +97,14 @@ const chatModule: Module<ChatState, RootState> = {
       if (thread) {
         thread.messages.push(message);
         thread.updatedAt = Date.now();
+      }
+    },
+    
+    setThreadMessages(state: ChatState, { threadId, messages }: { threadId: number, messages: Message[] }) {
+      const thread = state.threads.find(t => t.id === threadId);
+      
+      if (thread) {
+        thread.messages = messages;
       }
     },
     
@@ -124,6 +139,24 @@ const chatModule: Module<ChatState, RootState> = {
       }
     },
     
+    // スレッドのメッセージをロード
+    async loadMessages({ commit, state }: Context, threadId: number) {
+      if (!threadId) return;
+      
+      commit('setLoading', true);
+      commit('setError', null);
+      
+      try {
+        const messages = await chatService.getMessages(threadId);
+        commit('setThreadMessages', { threadId, messages });
+      } catch (error) {
+        console.error(`Error loading messages for thread ${threadId}:`, error);
+        commit('setError', 'メッセージの読み込みに失敗しました');
+      } finally {
+        commit('setLoading', false);
+      }
+    },
+    
     // 新しいスレッドを作成
     async createThread({ commit, dispatch }: Context, { title, firstMessage }: { title: string, firstMessage: string }) {
       commit('setLoading', true);
@@ -132,6 +165,11 @@ const chatModule: Module<ChatState, RootState> = {
       try {
         const newThread = await chatService.createThread(title, firstMessage);
         commit('addThread', newThread);
+        
+        // スレッドが作成されたらメッセージも読み込む
+        if (newThread.id) {
+          await dispatch('loadMessages', newThread.id);
+        }
       } catch (error) {
         console.error('Error creating thread:', error);
         commit('setError', 'スレッドの作成に失敗しました');
@@ -152,24 +190,31 @@ const chatModule: Module<ChatState, RootState> = {
           message: userMessage
         });
         
-        // ボットの応答をシミュレート
+        // ボットの応答を取得中の状態にする
+        commit('setTyping', true);
+        
+        // アシスタントの応答を取得 (実際のシステムではここはWebSocket等のリアルタイム通信になる可能性あり)
+        // 今回はモックAPIのため、シミュレーションとして一定時間後に応答
         setTimeout(async () => {
-          // 実際のAPIでは、ここでボットの応答を取得するエンドポイントを呼び出す
-          const botMessage: Message = {
-            id: Math.floor(Math.random() * 10000),
-            text: `「${text}」に対する応答です。これはシミュレートされたボットの返信です。`,
-            sender: 'assistant',
-            timestamp: Date.now()
-          };
-          
-          commit('addMessage', {
-            threadId: state.currentThreadId,
-            message: botMessage
-          });
-        }, 1000);
+          try {
+            const botMessage = await chatService.sendAssistantMessage(state.currentThreadId as number, 
+              `「${text}」について理解しました。どのようにお手伝いできますか？`);
+            
+            commit('addMessage', {
+              threadId: state.currentThreadId as number,
+              message: botMessage
+            });
+          } catch (error) {
+            console.error('Error getting bot response:', error);
+            commit('setError', 'ボットの応答を取得できませんでした');
+          } finally {
+            commit('setTyping', false);
+          }
+        }, 1500);
       } catch (error) {
         console.error('Error sending message:', error);
         commit('setError', 'メッセージの送信に失敗しました');
+        commit('setTyping', false);
       }
     },
     
@@ -179,8 +224,13 @@ const chatModule: Module<ChatState, RootState> = {
     },
     
     // 現在のスレッドを変更
-    setCurrentThread({ commit }: Context, threadId: number | null) {
+    async setCurrentThread({ commit, dispatch }: Context, threadId: number | null) {
       commit('setCurrentThreadId', threadId);
+      
+      // スレッドが選択されたらメッセージを読み込む
+      if (threadId !== null) {
+        await dispatch('loadMessages', threadId);
+      }
     }
   }
 };
