@@ -1,11 +1,10 @@
 import { Module, ActionContext } from 'vuex';
 import { RootState } from '../types';
+import { userService } from '../../api/services';
 
 export interface AuthState {
   isAuthenticated: boolean;
-  user: {
-    username: string;
-  } | null;
+  user: any | null;
 }
 
 const authModule: Module<AuthState, RootState> = {
@@ -20,36 +19,51 @@ const authModule: Module<AuthState, RootState> = {
     setAuth(state: AuthState, isAuthenticated: boolean) {
       state.isAuthenticated = isAuthenticated;
     },
-    setUser(state: AuthState, user: { username: string } | null) {
+    setUser(state: AuthState, user: any | null) {
       state.user = user;
     }
   },
   
   actions: {
-    login({ commit }: ActionContext<AuthState, RootState>, username: string) {
-      // 実際のアプリでは、ここで認証APIを呼び出します
-      commit('setAuth', true);
-      commit('setUser', { username });
-      
-      // ローカルストレージに保存（実際のアプリではトークンを保存）
-      localStorage.setItem('user', JSON.stringify({ username }));
+    // ログイン処理
+    async login({ commit }: ActionContext<AuthState, RootState>) {
+      try {
+        // バックエンドのset-cookieエンドポイントを呼び出す
+        await userService.setUserCookie();
+        
+        // ユーザー情報を取得
+        const userData = await userService.getCurrentUser();
+        
+        commit('setAuth', true);
+        commit('setUser', userData);
+        
+        return userData;
+      } catch (error) {
+        console.error('ログインエラー:', error);
+        throw error;
+      }
     },
     
+    // ログアウト処理
     logout({ commit }: ActionContext<AuthState, RootState>) {
+      // 実際のアプリではここでログアウトAPIを呼び出す
       commit('setAuth', false);
       commit('setUser', null);
-      
-      // ローカルストレージから削除
-      localStorage.removeItem('user');
     },
     
-    checkAuth({ commit }: ActionContext<AuthState, RootState>) {
-      // ページ読み込み時に認証状態を確認
-      const userStr = localStorage.getItem('user');
-      if (userStr) {
-        const user = JSON.parse(userStr);
+    // 認証状態チェック
+    async checkAuth({ commit }: ActionContext<AuthState, RootState>) {
+      try {
+        // バックエンドからユーザー情報を取得
+        const userData = await userService.getCurrentUser();
         commit('setAuth', true);
-        commit('setUser', user);
+        commit('setUser', userData);
+        return userData;
+      } catch (error) {
+        // エラーの場合は認証されていない
+        commit('setAuth', false);
+        commit('setUser', null);
+        return null;
       }
     }
   },

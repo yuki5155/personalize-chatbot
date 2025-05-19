@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
 import store from '../store';
+import { userService } from '../api/services';
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -31,7 +32,14 @@ const router = createRouter({
 });
 
 // ナビゲーションガード
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
+  // 認証状態を毎回APIから取得
+  try {
+    await store.dispatch('auth/checkAuth');
+  } catch (error) {
+    console.error('認証状態の確認中にエラーが発生しました:', error);
+  }
+
   // 認証が必要なルートかチェック
   if (to.matched.some(record => record.meta.requiresAuth)) {
     // 認証状態をチェック

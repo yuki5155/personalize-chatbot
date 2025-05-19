@@ -12,7 +12,7 @@
         
         <div class="auth-buttons">
           <template v-if="isAuthenticated">
-            <span class="welcome-text">ようこそ、{{ currentUser?.username }}さん</span>
+            <span class="welcome-text">ようこそ、{{ getUserName() }}さん</span>
             <button @click="logout" class="auth-button logout-button">ログアウト</button>
           </template>
           <template v-else>
@@ -40,15 +40,28 @@ export default defineComponent({
     const isAuthenticated = computed(() => store.getters['auth/isAuthenticated']);
     const currentUser = computed(() => store.getters['auth/currentUser']);
 
+    // ユーザー名を取得する関数
+    const getUserName = () => {
+      const user = currentUser.value;
+      // バックエンドの応答形式に基づいてユーザー名を抽出
+      if (user) {
+        return user.name || user.username || user.id || 'ユーザー';
+      }
+      return 'ゲスト';
+    };
+
     // ページロード時に認証状態をチェック
     onMounted(() => {
       store.dispatch('auth/checkAuth');
     });
 
     // ログイン処理
-    const login = () => {
-      // デフォルトユーザー名でログイン
-      store.dispatch('auth/login', 'ゲスト');
+    const login = async () => {
+      try {
+        await store.dispatch('auth/login');
+      } catch (error) {
+        console.error('ログイン処理中にエラーが発生しました:', error);
+      }
     };
 
     // ログアウト処理
@@ -59,6 +72,7 @@ export default defineComponent({
     return {
       isAuthenticated,
       currentUser,
+      getUserName,
       login,
       logout
     };
