@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Any, Literal
 from datetime import datetime, timedelta
 import time
+from app.dependencies import get_user_from_cookie
 
 router = APIRouter(
     prefix="/threads",
@@ -10,9 +11,12 @@ router = APIRouter(
 
 
 @router.get("")
-def get_threads() -> List[Dict[str, Any]]:
+async def get_threads(user: Dict[str, Any] = Depends(get_user_from_cookie)) -> List[Dict[str, Any]]:
     """
-    スレッドの一覧を取得します（モックデータ）
+    ログインユーザー専用: スレッドの一覧を取得します（モックデータ）
+    
+    Args:
+        user: 認証されたユーザー情報（依存関数から取得）
     
     Returns:
         List[Dict]: スレッドの一覧
@@ -103,18 +107,22 @@ def get_threads() -> List[Dict[str, Any]]:
 
 
 @router.get("/{thread_id}")
-def get_thread(thread_id: int) -> Dict[str, Any]:
+async def get_thread(thread_id: int, user: Dict[str, Any] = Depends(get_user_from_cookie)) -> Dict[str, Any]:
     """
-    指定されたIDのスレッドを取得します（モックデータ）
+    ログインユーザー専用: 指定されたIDのスレッドを取得します（モックデータ）
     
     Args:
         thread_id: スレッドID
+        user: 認証されたユーザー情報（依存関数から取得）
         
     Returns:
         Dict: スレッド情報
     """
+    # ログイン情報をログに出力（デバッグ用）
+    print(f"User {user['name']} (ID: {user['id']}) accessed thread {thread_id}")
+    
     # get_threadsから全スレッドを取得
-    all_threads = get_threads()
+    all_threads = await get_threads(user)
     
     # 指定されたIDのスレッドを検索
     for thread in all_threads:
