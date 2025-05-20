@@ -205,7 +205,11 @@ export default defineComponent({
     
     // メッセージを送信
     const handleSendMessage = (text: string) => {
-      store.dispatch('chat/sendMessage', text);
+      // ストリーミングレスポンスを使う場合はこちらを使用
+      store.dispatch('chat/sendMessageWithStreamingResponse', text);
+      
+      // 通常のレスポンスを使う場合はこちらを使用
+      // store.dispatch('chat/sendMessage', text);
     };
     
     // 日付フォーマット
