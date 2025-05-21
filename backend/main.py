@@ -11,10 +11,12 @@ app = FastAPI(title="Simple API", description="固定値を返すシンプルな
 
 # フロントエンドのオリジン
 origins = [
-    "http://localhost:5173",
+    "http://localhost:5173",  # Viteのデフォルトポート
     "http://127.0.0.1:5173",
-    "http://localhost:3000",
+    "http://localhost:3000",  # Create React Appのデフォルトポート
     "http://127.0.0.1:3000",
+    "http://localhost:8080",  # 他の一般的なフロントエンドポート
+    "http://127.0.0.1:8080",
     # 必要に応じて追加
 ]
 

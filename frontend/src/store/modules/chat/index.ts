@@ -100,6 +100,17 @@ const chatModule: Module<ChatState, RootState> = {
       }
     },
     
+    updateMessageText(state: ChatState, { threadId, messageId, text }: { threadId: number, messageId: number, text: string }) {
+      const thread = state.threads.find(t => t.id === threadId);
+      
+      if (thread) {
+        const message = thread.messages.find(m => m.id === messageId);
+        if (message) {
+          message.text = text;
+        }
+      }
+    },
+    
     setThreadMessages(state: ChatState, { threadId, messages }: { threadId: number, messages: Message[] }) {
       const thread = state.threads.find(t => t.id === threadId);
       
@@ -214,6 +225,64 @@ const chatModule: Module<ChatState, RootState> = {
       } catch (error) {
         console.error('Error sending message:', error);
         commit('setError', 'メッセージの送信に失敗しました');
+        commit('setTyping', false);
+      }
+    },
+    
+    // メッセージを送信（ユーザーから）- ストリーミングレスポンス版
+    async sendMessageWithStreamingResponse({ commit, state }: Context, text: string) {
+      if (!state.currentThreadId) return;
+      
+      try {
+        console.log('ストリーミングレスポンスアクション開始:', text);
+        
+        // ユーザーメッセージを送信
+        const userMessage = await chatService.sendMessage(state.currentThreadId, text);
+        console.log('ユーザーメッセージ送信完了:', userMessage);
+        
+        commit('addMessage', {
+          threadId: state.currentThreadId,
+          message: userMessage
+        });
+        
+        // ボットの応答を取得中の状態にする
+        commit('setTyping', true);
+        
+        // メッセージの空のシェルを作成
+        const initialBotMessage = {
+          id: userMessage.id + 1,  // 一時的なID (実際にはサーバーからの応答で上書きされる)
+          text: '',
+          sender: 'assistant' as 'assistant',
+          timestamp: Date.now()
+        };
+        
+        console.log('初期ボットメッセージを作成:', initialBotMessage);
+        
+        commit('addMessage', {
+          threadId: state.currentThreadId,
+          message: initialBotMessage
+        });
+        
+        // ストリーミングレスポンスを開始
+        await chatService.sendAssistantMessageStream(
+          state.currentThreadId,
+          `「${text}」について理解しました。どのようにお手伝いできますか？`,
+          (progressText) => {
+            console.log('ストリーミング進捗:', progressText);
+            // 進捗に応じてメッセージを更新
+            commit('updateMessageText', {
+              threadId: state.currentThreadId,
+              messageId: initialBotMessage.id,
+              text: progressText
+            });
+          }
+        );
+        
+        console.log('ストリーミングレスポンス完了');
+      } catch (error) {
+        console.error('Error sending message with streaming response:', error);
+        commit('setError', 'メッセージの送信に失敗しました');
+      } finally {
         commit('setTyping', false);
       }
     },

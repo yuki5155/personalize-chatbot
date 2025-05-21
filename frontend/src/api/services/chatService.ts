@@ -58,6 +58,68 @@ const chatService = {
     }
   },
 
+  // アシスタントからのメッセージ送信 (ストリーミング)
+  sendAssistantMessageStream: async (
+    threadId: number, 
+    text: string,
+    onProgress: (text: string) => void
+  ): Promise<void> => {
+    try {
+      console.log(`ストリーミングリクエスト開始: threadId=${threadId}, text="${text}"`);
+      
+      // Viteのプロキシ設定を使用して相対パスで通信
+      const url = `/messages/${threadId}/assistant/stream`;
+      
+      console.log('ストリーミングURL:', url);
+      
+      // Response typeをblobに設定して生のデータを受け取る
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
+        credentials: 'include', // クッキーを送信するために必要
+      });
+
+      console.log('ストリーミングレスポンス受信:', response.status, response.statusText);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}, statusText: ${response.statusText}`);
+      }
+
+      // レスポンスをストリームとして読み込む
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Response body is null');
+      }
+
+      const decoder = new TextDecoder();
+      let receivedText = '';
+
+      // ストリームからデータを読み込み続ける
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          console.log('ストリーミング完了:', receivedText);
+          break;
+        }
+        
+        // バイナリデータをテキストにデコード
+        const chunk = decoder.decode(value, { stream: true });
+        console.log('チャンク受信:', chunk);
+        receivedText += chunk;
+        
+        // 進捗コールバックを呼び出す
+        onProgress(receivedText);
+      }
+    } catch (error) {
+      console.error('ストリーミングメッセージの送信に失敗しました:', error);
+      throw error;
+    }
+  },
+
   // 新しいスレッドの作成
   createThread: async (title: string, first_message: string): Promise<Thread> => {
     try {

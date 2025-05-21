@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, Depends, Body
 from typing import List, Dict, Any, Literal, Optional
 from datetime import datetime, timedelta
 import time
+import asyncio
+from fastapi.responses import StreamingResponse
 from app.dependencies import get_user_from_cookie
 from pydantic import BaseModel
 
@@ -161,4 +163,99 @@ async def create_assistant_message(
     # ログイン情報をログに出力（デバッグ用）
     print(f"User {user['name']} (ID: {user['id']}) added assistant message to thread {thread_id}")
     
-    return new_message 
+    return new_message
+
+@router.post("/{thread_id}/assistant/stream", status_code=200)
+async def create_assistant_message_stream(
+    thread_id: int,
+    message_data: MessageCreate,
+    user: Dict[str, Any] = Depends(get_user_from_cookie)
+):
+    """
+    ログインユーザー専用: 指定されたスレッドにアシスタントのメッセージをストリーミングで作成します
+    メッセージの文字列を10秒間かけて少しずつ送信します
+    
+    Args:
+        thread_id: メッセージを追加するスレッドのID
+        message_data: 作成するメッセージのデータ
+        user: 認証されたユーザー情報（依存関数から取得）
+        
+    Returns:
+        StreamingResponse: 文字列を徐々に返すストリーミングレスポンス
+    """
+    global MAX_MESSAGE_ID
+    
+    print(f"ストリーミングリクエスト受信: thread_id={thread_id}, message={message_data.text}")
+    
+    # 指定されたIDのスレッドを検索
+    thread = None
+    for t in MOCK_THREADS:
+        if t["id"] == thread_id:
+            thread = t
+            break
+    
+    if thread is None:
+        print(f"スレッド {thread_id} が見つかりません")
+        raise HTTPException(status_code=404, detail="Thread not found")
+    
+    # スレッドがアクティブでない場合はエラー
+    if not thread["isActive"]:
+        print(f"スレッド {thread_id} は非アクティブです")
+        raise HTTPException(status_code=400, detail="Cannot add message to inactive thread")
+    
+    # 現在の時刻を取得（ミリ秒）
+    current_time = int(time.time() * 1000)
+    
+    # IDをインクリメント
+    MAX_MESSAGE_ID += 1
+    print(f"新しいメッセージID: {MAX_MESSAGE_ID}")
+    
+    message_text = message_data.text
+    
+    # 新しいアシスタントメッセージを作成 (最初は空の状態で)
+    new_message = {
+        "id": MAX_MESSAGE_ID,
+        "text": "",  # 空の状態で始める
+        "sender": "assistant",
+        "timestamp": current_time
+    }
+    
+    # スレッドのメッセージリストに追加
+    thread["messages"].append(new_message)
+    
+    # スレッドの更新日時を更新
+    thread["updatedAt"] = current_time
+    
+    # ログイン情報をログに出力（デバッグ用）
+    print(f"User {user['name']} (ID: {user['id']}) started streaming assistant message to thread {thread_id}")
+    
+    async def message_generator():
+        """メッセージを少しずつ生成するジェネレータ関数"""
+        full_text = message_text
+        chars_total = len(full_text)
+        
+        print(f"ストリーミング開始: 全文字数={chars_total}, 予想時間=10秒")
+        
+        # 完全なメッセージを10秒かけて送信
+        delay_per_char = 10.0 / chars_total if chars_total > 0 else 0
+        
+        # 少しずつ文字を送信
+        for i in range(chars_total):
+            # スレッドのメッセージを更新
+            new_message["text"] = full_text[:i+1]
+            
+            # 現在の文字を送信
+            current_char = full_text[i:i+1]
+            print(f"文字送信: '{current_char}' ({i+1}/{chars_total})")
+            yield current_char
+            
+            # 次の文字までの待機時間
+            await asyncio.sleep(delay_per_char)
+        
+        print("ストリーミング完了")
+    
+    print("StreamingResponseを返します")
+    return StreamingResponse(
+        message_generator(),
+        media_type="text/plain"
+    ) 
