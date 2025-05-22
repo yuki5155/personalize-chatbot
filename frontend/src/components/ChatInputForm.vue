@@ -7,7 +7,7 @@
           v-model="message"
           placeholder="メッセージを入力..."
           :disabled="disabled"
-          @keydown.enter.prevent="onEnterPress"
+          @keydown.enter="onEnterPress"
           @input="autoResize"
         ></textarea>
         <button 
@@ -59,11 +59,15 @@ export default defineComponent({
     
     // エンターキーハンドラー
     const onEnterPress = (e: KeyboardEvent) => {
+      // IME変換中の場合は何もしない
+      if (e.isComposing || e.keyCode === 229) return;
+      
       // Shift+Enterなら改行を許可
       if (e.shiftKey) return;
       
       // 通常のEnterはメッセージ送信
       if (canSubmit.value) {
+        e.preventDefault();
         submitMessage();
       }
     };
