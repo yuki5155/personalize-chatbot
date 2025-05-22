@@ -6,7 +6,7 @@ import asyncio
 from fastapi.responses import StreamingResponse
 from app.dependencies import get_user_from_cookie
 from pydantic import BaseModel
-from app.services.chat_message_service import chat_message_service
+from app.application.services.chat_message_service import chat_message_service
 
 router = APIRouter(
     prefix="/messages",
