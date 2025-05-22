@@ -60,3 +60,13 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 - `Presets`: チャットプリセット
 
 これらのテーブルは、アプリケーション起動時に自動的に作成されます。 
+
+### PYTHONPATHの設定
+
+開発時には、以下のコマンドでPYTHONPATHを設定することをお勧めします：
+
+```bash
+export PYTHONPATH=$PYTHONPATH:/workspaces/backend
+```
+
+これにより、モジュールのインポートが正しく動作します。 

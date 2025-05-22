@@ -8,6 +8,9 @@ ENV PYTHONUNBUFFERED=1
 ENV IS_LOCAL=true
 ENV DYNAMODB_ENDPOINT=http://dynamodb-local:8000
 
+# pythonpathの設定
+ENV PYTHONPATH=/app
+
 # タイムゾーンの設定
 ENV TZ=Asia/Tokyo
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
@@ -16,7 +19,8 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get install -y git
 
 # 依存関係をコピーしてインストール
 COPY requirements.txt .
