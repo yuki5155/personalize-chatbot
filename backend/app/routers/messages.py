@@ -6,6 +6,7 @@ import asyncio
 from fastapi.responses import StreamingResponse
 from app.dependencies import get_user_from_cookie
 from pydantic import BaseModel
+from app.services.chat_message_service import chat_message_service
 
 router = APIRouter(
     prefix="/messages",
@@ -232,29 +233,11 @@ async def create_assistant_message_stream(
     async def message_generator():
         """メッセージを少しずつ生成するジェネレータ関数"""
         full_text = message_text
-        chars_total = len(full_text)
-        
-        print(f"ストリーミング開始: 全文字数={chars_total}, 予想時間=10秒")
-        
-        # 完全なメッセージを10秒かけて送信
-        delay_per_char = 10.0 / chars_total if chars_total > 0 else 0
-        
-        # 少しずつ文字を送信
-        for i in range(chars_total):
-            # スレッドのメッセージを更新
-            new_message["text"] = full_text[:i+1]
-            
-            # 現在の文字を送信
-            current_char = full_text[i:i+1]
-            print(f"文字送信: '{current_char}' ({i+1}/{chars_total})")
-            yield current_char
-            
-            # 次の文字までの待機時間
-            await asyncio.sleep(delay_per_char)
-        
-        print("ストリーミング完了")
-    
-    print("StreamingResponseを返します")
+ 
+        async for text in chat_message_service(message_text):
+            new_message["text"] = text
+            yield text
+
     return StreamingResponse(
         message_generator(),
         media_type="text/plain"
