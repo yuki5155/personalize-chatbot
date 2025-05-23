@@ -2,6 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import api_router
 import logging
+# .envを読み込む
+from dotenv import load_dotenv
+import os
+
+if os.environ.get('IS_LOCAL').lower() == 'true':
+    load_dotenv()
 
 # ロギングの設定
 logging.basicConfig(level=logging.INFO)
