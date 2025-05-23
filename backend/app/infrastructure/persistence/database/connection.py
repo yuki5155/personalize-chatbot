@@ -65,9 +65,19 @@ class DynamoDBConnection:
         response = self.table.get_item(Key=key)
         return response.get('Item')
     
+    def read_by_id(self, id: str):
+        response = self.table.get_item(Key={'id': id})
+        return response.get('Item')
+    
     def read_via_gsi(self, gsi_name: str, key_name: str, key_value: str):
         response = self.table.query(
             IndexName=gsi_name,
+            KeyConditionExpression=Key(key_name).eq(key_value)
+        )
+        return response.get('Items')
+    
+    def query(self, key_name: str, key_value: str):
+        response = self.table.query(
             KeyConditionExpression=Key(key_name).eq(key_value)
         )
         return response.get('Items')

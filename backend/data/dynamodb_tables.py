@@ -19,21 +19,21 @@ def create_dynamodb_tables():
             'TableName': f"{env}-chat-messages",
             'KeySchema': [
                 {
-                    'AttributeName': 'thread_id',
+                    'AttributeName': 'id',
                     'KeyType': 'HASH'  # Partition key
                 },
                 {
-                    'AttributeName': 'timestamp',
+                    'AttributeName': 'createdAt',
                     'KeyType': 'RANGE'  # Sort key
                 }
             ],
             'AttributeDefinitions': [
                 {
-                    'AttributeName': 'thread_id',
+                    'AttributeName': 'id',
                     'AttributeType': 'S'
                 },
                 {
-                    'AttributeName': 'timestamp',
+                    'AttributeName': 'createdAt',
                     'AttributeType': 'S'
                 },
                 {
@@ -50,7 +50,7 @@ def create_dynamodb_tables():
                             'KeyType': 'HASH'
                         },
                         {
-                            'AttributeName': 'timestamp',
+                            'AttributeName': 'createdAt',
                             'KeyType': 'RANGE'
                         }
                     ],
