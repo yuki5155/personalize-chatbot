@@ -1,5 +1,6 @@
 from app.infrastructure.persistence.database.connection import DynamoDBConnection
 from app.infrastructure.models.chat_model import ChatModel, ChatMessage
+from app.domain.threads_domain import ThreadDomain
 from app.domain.enums import ChatMessageRole
 from datetime import datetime
 from typing import List
@@ -63,7 +64,7 @@ class ChatRepository:
         key = {'id': chat_model.id, 'createdAt': chat_model.createdAt}
         self.dynamodb_connection.delete(key)
 
-    def list(self, user_id: str)->List[ChatModel]:
+    def list(self, user_id: str)->List[ThreadDomain]:
         items = self.dynamodb_connection.read_via_gsi('user_id-index', 'user_id', user_id)
         chat_models = []
         for item in items:
@@ -75,7 +76,7 @@ class ChatRepository:
                 title=item['title'],
                 createdAt=item['createdAt'],
                 updatedAt=item['updatedAt']
-            ))
+            ).to_domain())
         return chat_models
     
 
@@ -158,6 +159,10 @@ if __name__ == "__main__":
     final_chat_model = chat_repository.read_by_id(thread_domain.id)
     print("Final model with assistant response:")
     print(final_chat_model.to_domain())
+
+    # read by user id
+    threads = chat_repository.list("test-user-123")
+    print(threads)
 
 
 

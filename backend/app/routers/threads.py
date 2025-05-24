@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 import time
 from app.dependencies import get_user_from_cookie
 from pydantic import BaseModel
+from app.routers.responses import ThreadItem, ThreadItemSingle, Message
+from app.application.services.chat_message_service import ChatMessageService
 
 router = APIRouter(
     prefix="/threads",
@@ -103,7 +105,7 @@ class ThreadCreate(BaseModel):
     first_message: str
 
 
-@router.get("")
+@router.get("", response_model=List[ThreadItem])
 async def get_threads(user: Dict[str, Any] = Depends(get_user_from_cookie)) -> List[Dict[str, Any]]:
     """
     ログインユーザー専用: スレッドの一覧を取得します
@@ -116,11 +118,63 @@ async def get_threads(user: Dict[str, Any] = Depends(get_user_from_cookie)) -> L
     """
     # ログイン情報をログに出力（デバッグ用）
     print(f"User {user['name']} (ID: {user['id']}) accessed threads list")
+    converted_threads = []
     
-    return MOCK_THREADS
+    chat_message_service = ChatMessageService()
+    threads = await chat_message_service.get_threads_by_user_id(user['id'])
+    for thread in threads:
+        # Convert UUID string to integer for response model
+        try:
+            thread_id = int(thread.id.split('-')[0], 16)  # Convert first part of UUID to integer
+        except (ValueError, IndexError):
+            thread_id = hash(thread.id) % 10000000  # Fallback to hash if conversion fails
+            
+        # Convert ISO timestamps to Unix timestamps (milliseconds)
+        try:
+            # Handle ISO format with optional Z timezone indicator
+            created_at_str = thread.createdAt.replace('Z', '')
+            created_at = int(datetime.strptime(created_at_str, "%Y-%m-%dT%H:%M:%S.%f").timestamp() * 1000)
+        except ValueError:
+            created_at = int(time.time() * 1000)  # Fallback to current time
+            
+        try:
+            # Handle ISO format with optional Z timezone indicator
+            updated_at_str = thread.updatedAt.replace('Z', '')
+            updated_at = int(datetime.strptime(updated_at_str, "%Y-%m-%dT%H:%M:%S.%f").timestamp() * 1000)
+        except ValueError:
+            updated_at = int(time.time() * 1000)  # Fallback to current time
+            
+        # Convert messages with error handling
+        thread_messages = []
+        for message in thread.chat_messages.messages:
+            try:
+                # Parse timestamp with proper handling of Z timezone
+                message_created_at = message.createdAt.replace('Z', '')
+                timestamp = int(datetime.strptime(message_created_at, "%Y-%m-%dT%H:%M:%S.%f").timestamp() * 1000)
+            except (ValueError, AttributeError):
+                # Fallback to current time if parsing fails
+                timestamp = int(time.time() * 1000)
+                
+            thread_messages.append(Message(
+                id=int(hash(message.id) % 10000000) if isinstance(message.id, str) else message.id,
+                text=message.message,
+                sender=message.role,
+                timestamp=timestamp
+            ))
+            
+        converted_threads.append(ThreadItem(
+            id=thread_id,
+            title=thread.title,
+            messages=thread_messages,
+            createdAt=created_at,
+            updatedAt=updated_at,
+            isActive=thread.is_active
+        ))
+
+    return converted_threads
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, response_model=ThreadItemSingle)
 async def create_thread(
     thread_data: ThreadCreate,
     user: Dict[str, Any] = Depends(get_user_from_cookie)
@@ -170,7 +224,7 @@ async def create_thread(
     return new_thread
 
 
-@router.get("/{thread_id}")
+@router.get("/{thread_id}", response_model=ThreadItemSingle)
 async def get_thread(thread_id: int, user: Dict[str, Any] = Depends(get_user_from_cookie)) -> Dict[str, Any]:
     """
     ログインユーザー専用: 指定されたIDのスレッドを取得します

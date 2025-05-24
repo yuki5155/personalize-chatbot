@@ -3,6 +3,7 @@ import os
 from langgraph.prebuilt import create_react_agent
 import asyncio
 from langchain_core.messages import HumanMessage
+from app.infrastructure.repositories.chat_repository import ChatRepository
 
 model = ChatAnthropic(
     model="claude-3-5-sonnet-20240620",
@@ -23,12 +24,22 @@ async def chat_message_service(message: str):
         if metadata["langgraph_node"] == "agent" and (text := step.text()):
             yield text
 
-async def main():
-    async for text in chat_message_service("would you generate a poem about a cat"):
-        print(text)
+class ChatMessageService:
+    def __init__(self, chat_repository: ChatRepository = ChatRepository(f"{os.environ['ENV']}-chat-messages")):
+        self.chat_repository = chat_repository
+
+    async def get_threads_by_user_id(self, user_id: str):
+        threads = self.chat_repository.list(user_id)
+        return threads
+
 
 
 # Run the async function
 if __name__ == "__main__":
+    async def main():
+        chat_message_service = ChatMessageService()
+        threads = await chat_message_service.get_threads_by_user_id("test-user-123")
+        print(threads)
+
     asyncio.run(main())
     
